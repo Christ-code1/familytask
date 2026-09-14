@@ -1,13 +1,326 @@
-/* Niveau 1 — l'ossature de la page (écran de bienvenue).
-   Le style de la todo-list (liste, tâche barrée, poubelle...) n'existe pas
-   encore : c'est TOI qui vas le créer à l'atelier 2, étape 6. */
-:root { --main: #2B3A67; --accent: #4f6bed; }
-* { box-sizing: border-box; font-family: system-ui, Arial, sans-serif; }
-body { margin: 0; background: #f4f6fb; color: #1b2333; }
-header { background: linear-gradient(120deg, #2B3A67, #4f6bed); color: #fff; padding: 18px 20px; }
-header h1 { margin: 0; font-size: 20px; }
-main { max-width: 640px; margin: 24px auto; padding: 0 16px; }
-.card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 16px;
-        box-shadow: 0 2px 10px rgba(20,30,60,.07); }
-h2 { font-size: 15px; margin: 0 0 12px; color: var(--main); }
-.hint { font-size: 12px; color: #6b7280; }
+/* Une direction graphique originale : rouge, noir et papier ivoire. */
+:root {
+        --ink: #111111;
+        --paper: #f4f0e8;
+        --paper-dark: #ded8ce;
+        --red: #e52b32;
+        --red-dark: #a81720;
+        --yellow: #f4c542;
+        --dagger-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='rotate(-45 16 16)' stroke='%23111111' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M16 2L20 18L16 27L12 18Z' fill='%23e52b32'/%3E%3Cpath d='M10 18H22V22H10Z' fill='%23f4c542'/%3E%3Cpath d='M13 22H19V29H13Z' fill='%23111111'/%3E%3C/g%3E%3C/svg%3E") 16 2, auto;
+}
+
+* { box-sizing: border-box; }
+body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: 'Trebuchet MS', Arial, sans-serif;
+        cursor: var(--dagger-cursor);
+}
+button, input { cursor: var(--dagger-cursor); }
+body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        content: '';
+        opacity: .35;
+        background-image: radial-gradient(#111 0.7px, transparent 0.7px);
+        background-size: 7px 7px;
+        pointer-events: none;
+}
+
+.topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 112px;
+        padding: 20px max(24px, calc((100vw - 920px) / 2));
+        color: #fff;
+        background: var(--ink);
+        border-bottom: 8px solid var(--red);
+        transform: skewY(-2deg);
+        transform-origin: top left;
+}
+.topbar > * { transform: skewY(2deg); }
+.brand-lockup { display: flex; align-items: center; gap: 14px; }
+.brand-mark {
+        display: grid;
+        width: 45px;
+        height: 45px;
+        place-items: center;
+        color: var(--ink);
+        background: var(--yellow);
+        border: 3px solid #fff;
+        font-size: 27px;
+        transform: rotate(-9deg);
+}
+.eyebrow, .kicker, .section-label, .header-stamp, .task-count {
+        margin: 0;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .16em;
+}
+.eyebrow { color: var(--yellow); }
+.topbar h1 {
+        margin: 1px 0 0;
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(28px, 5vw, 44px);
+        line-height: .95;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+}
+.header-stamp {
+        padding: 7px 9px;
+        border: 2px solid #fff;
+        transform: rotate(5deg) skewY(2deg);
+}
+
+.page-shell { max-width: 780px; margin: 0 auto; padding: 65px 20px 56px; }
+.hero-copy { margin-bottom: 28px; }
+.kicker { display: inline-block; padding: 6px 9px; color: #fff; background: var(--red); transform: skewX(-12deg); }
+.hero-copy h2 {
+        margin: 12px 0 2px;
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(48px, 10vw, 86px);
+        line-height: .88;
+        letter-spacing: .01em;
+        text-transform: uppercase;
+        transform: skewX(-6deg);
+}
+.subtitle { max-width: 420px; margin: 14px 0 0; font-size: 15px; font-weight: 700; }
+
+.card {
+        position: relative;
+        padding: 28px;
+        background: #fff;
+        border: 3px solid var(--ink);
+        box-shadow: 10px 10px 0 var(--red);
+}
+.card::before {
+        position: absolute;
+        top: -3px;
+        right: 28px;
+        width: 44px;
+        height: 9px;
+        content: '';
+        background: var(--yellow);
+        border: 3px solid var(--ink);
+        border-top: 0;
+}
+.board-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.section-label { color: var(--red); }
+.board-heading h3 { margin: 5px 0 0; font-size: 25px; text-transform: uppercase; }
+.task-count { padding: 7px 9px; color: #fff; background: var(--ink); white-space: nowrap; }
+.task-form { display: flex; align-items: stretch; gap: 10px; margin: 25px 0; }
+.task-form input {
+        min-width: 0;
+        flex: 1;
+        padding: 13px 12px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        border-radius: 0;
+        font: inherit;
+        font-weight: 700;
+}
+.task-form input:focus { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.deadline-field {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        min-width: 112px;
+        padding: 5px 8px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+}
+.deadline-field input {
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        font-size: 15px;
+}
+.deadline-field input:focus { outline: 0; }
+.task-form button {
+        padding: 0 20px;
+        color: #fff;
+        background: var(--red);
+        border: 2px solid var(--ink);
+        border-radius: 0;
+        box-shadow: 4px 4px 0 var(--ink);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 900;
+        text-transform: uppercase;
+}
+.task-form button:hover { background: var(--red-dark); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.task-list { margin: 0; padding: 0; list-style: none; }
+.task-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 56px;
+        padding: 10px 0 10px 14px;
+        border-top: 2px solid var(--ink);
+        border-left: 7px solid var(--red);
+}
+.task-title { font-size: 17px; font-weight: 900; }
+.task-deadline { display: block; margin-top: 3px; color: var(--red); font-size: 12px; font-weight: 900; }
+.done { color: inherit; }
+.delete-button {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        color: #fff;
+        background: var(--ink);
+        border: 0;
+        cursor: pointer;
+        font-size: 17px;
+        transition: background .15s, transform .15s;
+}
+.delete-button:hover { background: var(--red); transform: rotate(-8deg) scale(1.08); }
+.deadline-dialog h2 { color: #fff; }
+.warning-image {
+        display: block;
+        width: min(100%, 260px);
+        max-height: 150px;
+        margin: 0 auto 12px;
+        object-fit: cover;
+        border: 3px solid #fff;
+        box-shadow: 7px 7px 0 var(--red);
+        transform: rotate(2deg);
+}
+
+.confirmation-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: grid;
+        padding: 20px;
+        place-items: center;
+        background: rgba(17, 17, 17, .78);
+}
+.confirmation-dialog {
+        position: relative;
+        width: min(100%, 470px);
+        padding: 38px 32px 30px;
+        overflow: hidden;
+        color: #fff;
+        background: var(--ink);
+        border: 4px solid #fff;
+        box-shadow: 12px 12px 0 var(--red);
+        transform: rotate(-2deg);
+}
+.confirmation-dialog::before {
+        position: absolute;
+        top: 0;
+        right: -20px;
+        width: 58%;
+        height: 12px;
+        content: '';
+        background: var(--red);
+        transform: skewX(-28deg);
+}
+.confirmation-gif {
+        display: block;
+        width: min(100%, 280px);
+        max-height: 180px;
+        margin: 0 auto 22px;
+        object-fit: cover;
+        border: 3px solid #fff;
+        box-shadow: 7px 7px 0 var(--red);
+        transform: rotate(2deg);
+}
+.confirmation-mark {
+        position: absolute;
+        top: 26px;
+        right: 28px;
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        color: var(--ink);
+        background: var(--yellow);
+        border: 3px solid #fff;
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: 25px;
+        transform: rotate(8deg);
+}
+.confirmation-kicker {
+        margin: 0 0 9px;
+        color: var(--yellow);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .18em;
+}
+.confirmation-dialog h2 {
+        margin: 0;
+        color: #fff;
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(38px, 9vw, 58px);
+        line-height: .9;
+        text-transform: uppercase;
+        transform: skewX(-7deg);
+}
+.confirmation-message { max-width: 330px; margin: 20px 0 27px; line-height: 1.5; }
+.confirmation-message strong { color: var(--yellow); }
+.confirmation-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.confirmation-actions button {
+        min-height: 43px;
+        padding: 0 16px;
+        border: 2px solid #fff;
+        border-radius: 0;
+        cursor: var(--dagger-cursor);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 900;
+        text-transform: uppercase;
+}
+.cancel-button { color: #fff; background: transparent; }
+.confirm-button { color: #fff; background: var(--red); box-shadow: 4px 4px 0 #fff; }
+.cancel-button:hover { color: var(--ink); background: #fff; }
+.confirm-button:hover { background: var(--red-dark); transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
+.confirmation-actions button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+
+.welcome-gif-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #0b0b0b;
+        opacity: 1;
+        transition: opacity .7s ease;
+}
+.welcome-gif-overlay.is-fading {
+        opacity: 0;
+        pointer-events: none;
+}
+.welcome-gif {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+}
+
+@media (max-width: 560px) {
+        .topbar { min-height: 94px; padding: 17px 20px; }
+        .header-stamp { display: none; }
+        .page-shell { padding: 52px 16px 42px; }
+        .card { padding: 22px 18px; box-shadow: 7px 7px 0 var(--red); }
+        .task-form { align-items: stretch; flex-direction: column; }
+        .task-form button { min-height: 47px; }
+        .deadline-field { min-height: 52px; }
+        .confirmation-dialog { padding: 34px 22px 24px; box-shadow: 7px 7px 0 var(--red); }
+        .confirmation-gif { width: min(100%, 240px); max-height: 150px; }
+        .confirmation-actions { flex-direction: column-reverse; }
+        .confirmation-actions button { width: 100%; }
+}
