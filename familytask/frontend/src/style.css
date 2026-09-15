@@ -75,6 +75,31 @@ body::before {
         border: 2px solid #fff;
         transform: rotate(5deg) skewY(2deg);
 }
+.topbar-actions { display: flex; align-items: center; gap: 12px; transform: skewY(2deg); }
+.member-greeting { color: var(--yellow); font-size: 13px; font-weight: 900; }
+.logout-button {
+        min-height: 36px;
+        padding: 0 11px;
+        color: #fff;
+        background: transparent;
+        border: 2px solid #fff;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+}
+.logout-button:hover { color: var(--ink); background: var(--yellow); }
+.auth-page { display: grid; min-height: 100vh; padding: 32px 20px; place-items: center; }
+.auth-card { width: min(100%, 500px); }
+.auth-card h1 { margin: 14px 0 8px; font-family: Impact, 'Arial Black', sans-serif; font-size: clamp(42px, 9vw, 68px); line-height: .9; text-transform: uppercase; }
+.auth-intro { margin: 0 0 24px; font-weight: 700; }
+.auth-form { display: grid; gap: 14px; }
+.auth-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.auth-form input, .auth-form select { width: 100%; padding: 12px; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); border-radius: 0; font: inherit; }
+.auth-form button { min-height: 48px; color: #fff; background: var(--red); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font: inherit; font-weight: 900; text-transform: uppercase; }
+.auth-form button:disabled { opacity: .6; }
+.auth-link { display: inline-block; margin-top: 24px; color: var(--red-dark); font-weight: 900; }
+.form-error { padding: 10px 12px; color: #fff; background: var(--red-dark); border: 2px solid var(--ink); font-weight: 700; }
 
 .page-shell { max-width: 780px; margin: 0 auto; padding: 65px 20px 56px; }
 .hero-copy { margin-bottom: 28px; }
