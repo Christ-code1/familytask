@@ -1,11 +1,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-// La liste des tâches est réactive : Vue met l'affichage à jour quand elle change.
-const tasks = ref([
-  { id: 1, title: 'Sortir les poubelles', deadline: null, done: false },
-  { id: 2, title: 'Faire les devoirs', deadline: null, done: true }
-])
+// La liste des tâches est récupérée depuis l'API, puis rendue réactive côté interface.
+const tasks = ref([])
 
 // Contient le texte saisi dans le champ.
 const newTask = ref('')
@@ -21,8 +18,25 @@ const showWelcomeGif = ref(true)
 const isWelcomeGifFading = ref(false)
 let clockTimer
 
+// Charge la liste des tâches depuis l'API au démarrage.
+async function fetchTasks() {
+  const response = await fetch('/api/tasks')
+
+  if (!response.ok) {
+    throw new Error('Impossible de charger les tâches depuis l’API.')
+  }
+
+  tasks.value = await response.json()
+}
+
 // L'écran d'accueil commence à disparaître en fondu après deux secondes.
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await fetchTasks()
+  } catch (error) {
+    console.error(error)
+  }
+
   window.setTimeout(() => {
     isWelcomeGifFading.value = true
 
@@ -62,23 +76,38 @@ function dismissWarning() {
   if (warningTask.value) dismissedWarningTaskId.value = warningTask.value.id
 }
 
-// Ajoute une nouvelle tâche dans la liste.
-function addTask() {
+// Ajoute une nouvelle tâche via l'API puis recharge la liste.
+async function addTask() {
   const title = newTask.value.trim()
 
   // On ignore l'ajout si le champ est vide.
   if (!title) return
 
-  tasks.value.push({
-    id: Date.now(),
-    title,
-    deadline: newTaskDeadline.value || null,
-    done: false
+  const response = await fetch(`/api/tasks?title=${encodeURIComponent(title)}`, {
+    method: 'POST'
   })
+
+  if (!response.ok) {
+    throw new Error('Impossible d’ajouter la tâche.')
+  }
 
   // On vide le champ après l'ajout.
   newTask.value = ''
   newTaskDeadline.value = ''
+  await fetchTasks()
+}
+
+// Bascule le statut done d'une tâche côté API puis recharge la liste.
+async function toggleTaskDone(taskId) {
+  const response = await fetch(`/api/tasks/${taskId}`, {
+    method: 'PATCH'
+  })
+
+  if (!response.ok) {
+    throw new Error('Impossible de cocher la tâche.')
+  }
+
+  await fetchTasks()
 }
 
 // Ouvre la confirmation pour la tâche sélectionnée.
@@ -87,12 +116,20 @@ function requestDelete(taskId) {
   if (task) taskToDelete.value = task
 }
 
-// Supprime la tâche après la confirmation dans la modale.
-function confirmDelete() {
+// Supprime la tâche après la confirmation dans la modale, puis recharge la liste.
+async function confirmDelete() {
   if (!taskToDelete.value) return
 
-  tasks.value = tasks.value.filter((task) => task.id !== taskToDelete.value.id)
+  const response = await fetch(`/api/tasks/${taskToDelete.value.id}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    throw new Error('Impossible de supprimer la tâche.')
+  }
+
   taskToDelete.value = null
+  await fetchTasks()
 }
 
 // Ferme la modale sans supprimer la tâche.
