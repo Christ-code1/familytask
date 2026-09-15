@@ -1,15 +1,20 @@
+import os
+
 from fastapi import FastAPI, HTTPException, Query  # Importe FastAPI, HTTPException et Query pour gérer les erreurs HTTP et la validation des paramètres.
 from fastapi.middleware.cors import CORSMiddleware  # Importe le middleware CORS pour autoriser les appels du frontend.
 from sqlmodel import Field, Session, SQLModel, create_engine, select  # Importe SQLModel, les champs, le gestionnaire de session et la fonction de sélection.
+from sqlalchemy import text
 
-DATABASE_URL = "sqlite:///./tasks.db"  # Définit l'URL de la base SQLite dans le dossier backend.
-engine = create_engine(DATABASE_URL)  # Crée le moteur SQLAlchemy qui permet de communiquer avec la base.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tasks.db")  # Utilise la base fournie par l'environnement, avec SQLite en repli local.
+engine_kwargs = {"connect_args": {"check_same_thread": False}} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, **engine_kwargs)  # Crée le moteur SQLAlchemy qui permet de communiquer avec la base.
 
 
 class Task(SQLModel, table=True):  # Définit le modèle SQLModel pour une tâche enregistrée en base.
     id: int | None = Field(default=None, primary_key=True)  # Définit l'identifiant unique, auto-généré par la base.
     title: str = Field(nullable=False)  # Définit le titre de la tâche, obligatoire.
     done: bool = Field(default=False)  # Définit l'état de la tâche, faux par défaut.
+    deadline: str | None = Field(default=None)  # Définit l'heure limite facultative au format HH:MM.
 
 
 app = FastAPI(title="FamilyTask")  # Crée l'application FastAPI principale avec le nom du projet.
@@ -19,6 +24,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.on_event("startup")  # Exécute cette fonction au démarrage de l'application.
 def create_db_and_tables():  # Crée les tables de la base si elles n'existent pas.
     SQLModel.metadata.create_all(engine)  # Génère toutes les tables définies par les modèles SQLModel.
+    if DATABASE_URL.startswith("sqlite"):
+        with engine.begin() as connection:
+            columns = connection.execute(text("PRAGMA table_info(task)")).all()
+            if not any(column[1] == "deadline" for column in columns):
+                connection.execute(text("ALTER TABLE task ADD COLUMN deadline VARCHAR"))
 
 
 @app.get("/api/health")  # Définit une route GET pour vérifier que l'API fonctionne.
@@ -34,12 +44,15 @@ def get_tasks():  # Fonction appelée pour lire toutes les tâches enregistrées
 
 
 @app.post("/api/tasks")  # Définit une route POST pour créer une nouvelle tâche.
-def create_task(title: str = Query(..., min_length=1, description="Titre de la tâche, obligatoire et non vide.")):  # Reçoit le titre et refuse les valeurs vides avec une validation FastAPI.
+def create_task(
+    title: str = Query(..., min_length=1, description="Titre de la tâche, obligatoire et non vide."),
+    deadline: str | None = Query(default=None, description="Heure limite facultative au format HH:MM."),
+):  # Reçoit le titre et l'heure limite facultative de la tâche.
     if not title or not title.strip():  # Vérifie qu'il y a bien un titre significatif après suppression des espaces.
         raise HTTPException(status_code=422, detail="Title cannot be empty")  # Refuse proprement une tâche sans nom avec une erreur 422.
 
     with Session(engine) as session:  # Ouvre une session SQLModel pour écrire dans la base.
-        db_task = Task(title=title.strip(), done=False)  # Crée une nouvelle tâche avec un titre nettoyé et done à False.
+        db_task = Task(title=title.strip(), done=False, deadline=deadline)  # Crée une nouvelle tâche avec ses données nettoyées.
         session.add(db_task)  # Ajoute la tâche à la session avant l'enregistrement.
         session.commit()  # Enregistre la tâche dans la base de données.
         session.refresh(db_task)  # Recharge l'objet pour obtenir l'id généré automatiquement.

@@ -171,7 +171,7 @@ body::before {
         border-top: 2px solid var(--ink);
         border-left: 7px solid var(--red);
 }
-.task-title { font-size: 17px; font-weight: 900; }
+.task-title { font-size: 17px; font-weight: 900; cursor: pointer; }
 .task-deadline { display: block; margin-top: 3px; color: var(--red); font-size: 12px; font-weight: 900; }
 .done { color: inherit; }
 .delete-button {

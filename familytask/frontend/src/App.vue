@@ -83,7 +83,9 @@ async function addTask() {
   // On ignore l'ajout si le champ est vide.
   if (!title) return
 
-  const response = await fetch(`/api/tasks?title=${encodeURIComponent(title)}`, {
+  const deadline = newTaskDeadline.value
+  const deadlineQuery = deadline ? `&deadline=${encodeURIComponent(deadline)}` : ''
+  const response = await fetch(`/api/tasks?title=${encodeURIComponent(title)}${deadlineQuery}`, {
     method: 'POST'
   })
 
@@ -179,7 +181,16 @@ function cancelDelete() {
       <ul class="task-list">
         <li v-for="task in tasks" :key="task.id" class="task-row">
           <div>
-            <span class="task-title" :class="{ done: task.done }">{{ task.title }}</span>
+            <span
+              class="task-title"
+              :class="{ done: task.done }"
+              role="button"
+              tabindex="0"
+              :aria-label="`Marquer ${task.title} comme terminée`"
+              @click="toggleTaskDone(task.id)"
+              @keydown.enter="toggleTaskDone(task.id)"
+              @keydown.space.prevent="toggleTaskDone(task.id)"
+            >{{ task.title }}</span>
             <small v-if="task.deadline" class="task-deadline">pour {{ task.deadline }}</small>
           </div>
           <button
