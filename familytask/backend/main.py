@@ -1,7 +1,9 @@
+import json
 import hashlib
 import os
 import secrets
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query  # Importe les outils FastAPI pour les routes, les dépendances et la validation.
 from fastapi.middleware.cors import CORSMiddleware  # Importe le middleware CORS pour autoriser les appels du frontend.
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # Déclare l'authentification Bearer pour OpenAPI et Swagger.
@@ -13,6 +15,22 @@ engine_kwargs = {"connect_args": {"check_same_thread": False}} if DATABASE_URL.s
 engine = create_engine(DATABASE_URL, **engine_kwargs)  # Crée le moteur SQLAlchemy qui permet de communiquer avec la base.
 bearer_scheme = HTTPBearer(auto_error=False)  # Permet à Swagger d'utiliser le bouton Authorize sans lever d'erreur automatiquement.
 LIENS_DEFAUT = ["mère", "père", "fille", "fils", "frère", "sœur", "grand-mère", "grand-père", "oncle", "tante"]  # Liste initiale des liens de parenté.
+TOOLS = [{
+    "type": "function",
+    "function": {
+        "name": "ajouter_tache",
+        "description": "Ajoute une tâche à la liste d'une personne de la famille.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "titre": {"type": "string", "description": "Le titre de la tâche."},
+                "personne": {"type": "string", "description": "Le nom ou le lien familial de la personne."},
+            },
+            "required": ["titre", "personne"],
+            "additionalProperties": False,
+        },
+    },
+}]
 
 
 def hash_password(pw: str) -> str:  # Transforme un mot de passe en hash SHA-256.
@@ -277,6 +295,67 @@ def get_family_tasks(
     return session.exec(
         select(Task).join(Member, Task.member_id == Member.id).where(Member.family_code == member.family_code)
     ).all()  # Filtre les tâches par la famille portée par le compte connecté.
+
+
+@app.post("/api/assistant")  # Définit une route POST pour interroger l'assistant IA.
+async def assistant(
+    message: str,
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Envoie le message du membre connecté à GitHub Models.
+    ai_token = os.getenv("AI_TOKEN", "").strip()
+    if not ai_token:
+        return {"reply": "L'assistant IA n'est pas configuré : la clé AI_TOKEN est manquante."}
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://models.github.ai/inference/chat/completions",
+                headers={"Authorization": f"Bearer {ai_token}"},
+                json={
+                    "model": "openai/gpt-4o-mini",
+                    "messages": [{"role": "user", "content": message}],
+                    "tools": TOOLS,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            assistant_message = data["choices"][0]["message"]
+            tool_calls = assistant_message.get("tool_calls") or []
+            if not tool_calls:
+                return {"reply": assistant_message.get("content", "")}
+
+            tool_call = tool_calls[0]
+            function = tool_call.get("function", {})
+            arguments = function.get("arguments", {})
+            if isinstance(arguments, str):
+                arguments = json.loads(arguments)
+            if function.get("name") != "ajouter_tache":
+                return {"reply": "L'assistant a demandé une action inconnue."}
+
+            title = str(arguments.get("titre", "")).strip()
+            person = str(arguments.get("personne", "")).strip().lower()
+            if not title or not person:
+                return {"reply": "Le titre et la personne sont nécessaires pour ajouter une tâche."}
+
+            assignee = next(
+                (
+                    family_member
+                    for family_member in session.exec(
+                        select(Member).where(Member.family_code == member.family_code)
+                    ).all()
+                    if family_member.name.strip().lower() == person
+                ),
+                None,
+            )
+            if not assignee:
+                return {"reply": f"Je ne trouve pas de membre correspondant à « {person} »."}
+
+            session.add(Task(title=title, member_id=assignee.id))
+            session.commit()
+            return {"reply": f'Tâche ajoutée pour {assignee.name} : « {title} ». '}
+    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
+        return {"reply": "L'assistant IA n'a pas pu répondre. Vérifie ta connexion et réessaie."}
 
 
 @app.post("/api/tasks")  # Définit une route POST pour créer une nouvelle tâche.

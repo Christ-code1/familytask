@@ -3,6 +3,7 @@ import Login from './views/Login.vue'
 import Signup from './views/Signup.vue'
 import TasksView from './views/TasksView.vue'
 import FamilyView from './views/FamilyView.vue'
+import AssistantView from './views/AssistantView.vue'
 import { apiFetch } from './api'
 
 const router = createRouter({
@@ -13,6 +14,7 @@ const router = createRouter({
     { path: '/signup', component: Signup, meta: { guestOnly: true } },
     { path: '/tasks', component: TasksView, meta: { requiresAuth: true } },
     { path: '/family', component: FamilyView, meta: { requiresAuth: true, adminOnly: true } },
+    { path: '/assistant', component: AssistantView, meta: { requiresAuth: true } },
   ],
 })
 
