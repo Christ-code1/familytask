@@ -8,7 +8,6 @@
         --yellow: #f4c542;
         --dagger-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='rotate(-45 16 16)' stroke='%23111111' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M16 2L20 18L16 27L12 18Z' fill='%23e52b32'/%3E%3Cpath d='M10 18H22V22H10Z' fill='%23f4c542'/%3E%3Cpath d='M13 22H19V29H13Z' fill='%23111111'/%3E%3C/g%3E%3C/svg%3E") 16 2, auto;
 }
-
 * { box-sizing: border-box; }
 body {
         margin: 0;
@@ -29,7 +28,6 @@ body::before {
         background-size: 7px 7px;
         pointer-events: none;
 }
-
 .topbar {
         display: flex;
         align-items: center;
@@ -314,6 +312,31 @@ body::before {
 .confirm-button:hover { background: var(--red-dark); transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
 .confirmation-actions button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 
+.family-shell { padding-bottom: 120px; }
+.family-card { margin-bottom: 24px; }
+.family-card h3 { margin: 6px 0 20px; font-size: 24px; text-transform: uppercase; }
+.member-list, .link-list { margin: 0; padding: 0; list-style: none; }
+.member-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 62px; padding: 10px 0 10px 14px; border-top: 2px solid var(--ink); border-left: 7px solid var(--red); }
+.member-row > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.member-relation, .task-owner { display: block; color: var(--red-dark); font-size: 12px; font-weight: 900; }
+.admin-badge { padding: 4px 7px; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.family-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.family-form { display: grid; gap: 12px; }
+.family-form label { display: grid; gap: 5px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.family-form input, .family-form select { width: 100%; padding: 11px; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); border-radius: 0; font: inherit; }
+.family-form button { min-height: 44px; color: #fff; background: var(--red); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font: inherit; font-weight: 900; text-transform: uppercase; }
+.family-form button:hover { background: var(--red-dark); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.checkbox-line { display: flex !important; align-items: center; grid-template-columns: auto 1fr; gap: 8px !important; }
+.checkbox-line input { width: auto; accent-color: var(--red); }
+.link-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
+.link-list li { padding: 6px 8px; background: var(--paper); border: 2px solid var(--ink); font-size: 12px; font-weight: 900; }
+.task-owner { margin-top: 4px; color: var(--ink); }
+.empty-state { padding: 20px 0; border-top: 2px solid var(--ink); font-weight: 700; }
+.form-success { padding: 10px 12px; color: var(--ink); background: var(--yellow); border: 2px solid var(--ink); font-weight: 700; }
+.bottom-tabs { position: fixed; right: 0; bottom: 0; left: 0; z-index: 8; display: flex; justify-content: center; gap: 4px; padding: 10px 20px 14px; background: var(--ink); border-top: 5px solid var(--red); }
+.bottom-tabs a { min-width: 130px; padding: 10px 18px; color: #fff; border: 2px solid #fff; font-size: 12px; font-weight: 900; text-align: center; text-decoration: none; text-transform: uppercase; }
+.bottom-tabs a.router-link-active { color: var(--ink); background: var(--yellow); }
+
 .welcome-gif-overlay {
         position: fixed;
         inset: 0;
@@ -348,4 +371,6 @@ body::before {
         .confirmation-gif { width: min(100%, 240px); max-height: 150px; }
         .confirmation-actions { flex-direction: column-reverse; }
         .confirmation-actions button { width: 100%; }
+        .family-grid { grid-template-columns: 1fr; gap: 0; }
+        .bottom-tabs a { min-width: 0; flex: 1; }
 }

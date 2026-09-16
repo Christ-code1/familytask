@@ -2,14 +2,17 @@ import hashlib
 import os
 import secrets
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query  # Importe les outils FastAPI pour les routes, les dépendances et la validation.
+from fastapi import Depends, FastAPI, HTTPException, Query  # Importe les outils FastAPI pour les routes, les dépendances et la validation.
 from fastapi.middleware.cors import CORSMiddleware  # Importe le middleware CORS pour autoriser les appels du frontend.
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # Déclare l'authentification Bearer pour OpenAPI et Swagger.
 from sqlmodel import Field, Session, SQLModel, create_engine, select  # Importe SQLModel, les champs, le gestionnaire de session et la fonction de sélection.
 from sqlalchemy import text
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tasks.db")  # Utilise la base fournie par l'environnement, avec SQLite en repli local.
 engine_kwargs = {"connect_args": {"check_same_thread": False}} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, **engine_kwargs)  # Crée le moteur SQLAlchemy qui permet de communiquer avec la base.
+bearer_scheme = HTTPBearer(auto_error=False)  # Permet à Swagger d'utiliser le bouton Authorize sans lever d'erreur automatiquement.
+LIENS_DEFAUT = ["mère", "père", "fille", "fils", "frère", "sœur", "grand-mère", "grand-père", "oncle", "tante"]  # Liste initiale des liens de parenté.
 
 
 def hash_password(pw: str) -> str:  # Transforme un mot de passe en hash SHA-256.
@@ -21,6 +24,13 @@ class Task(SQLModel, table=True):  # Définit le modèle SQLModel pour une tâch
     title: str = Field(nullable=False)  # Définit le titre de la tâche, obligatoire.
     done: bool = Field(default=False)  # Définit l'état de la tâche, faux par défaut.
     deadline: str | None = Field(default=None)  # Définit l'heure limite facultative au format HH:MM.
+    member_id: int | None = Field(default=None, foreign_key="member.id", index=True)  # Définit le membre auquel la tâche est assignée.
+
+
+class Lien(SQLModel, table=True):  # Définit un lien de parenté propre à une famille.
+    id: int | None = Field(default=None, primary_key=True)  # Définit l'identifiant unique du lien.
+    family_code: str = Field(index=True)  # Associe le lien à une famille précise.
+    label: str = Field(nullable=False)  # Stocke le libellé affiché du lien.
 
 
 class Member(SQLModel, table=True):  # Définit le modèle SQLModel pour un membre de la famille.
@@ -50,12 +60,17 @@ def public_member(member: Member) -> dict:  # Prépare les informations publique
     }
 
 
+def require_admin(member: Member) -> Member:  # Vérifie que le compte connecté possède les droits d'administration.
+    if not member.is_admin:  # Refuse les comptes qui ne peuvent pas gérer la famille.
+        raise HTTPException(status_code=403, detail="Seul l'admin peut gérer la famille")
+    return member  # Rend l'admin validé disponible à la route.
+
+
 def current_member(
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     session: Session = Depends(get_session),
 ) -> Member:  # Identifie le membre connecté à partir de son token Bearer.
-    scheme, _, token = (authorization or "").partition(" ")  # Sépare le schéma d'authentification et le token.
-    token = token.strip() if scheme.lower() == "bearer" else ""  # N'accepte que l'en-tête Authorization au format Bearer.
+    token = credentials.credentials if credentials else ""  # Récupère le token Bearer fourni par l'en-tête Authorization.
     member = session.exec(select(Member).where(Member.token == token)).first() if token else None  # Recherche le membre correspondant.
     if not member:  # Refuse les tokens absents, invalides ou déjà supprimés.
         raise HTTPException(status_code=401, detail="Non connecté")  # Renvoie une erreur d'authentification neutre.
@@ -69,11 +84,24 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.on_event("startup")  # Exécute cette fonction au démarrage de l'application.
 def create_db_and_tables():  # Crée les tables de la base si elles n'existent pas.
     SQLModel.metadata.create_all(engine)  # Génère toutes les tables définies par les modèles SQLModel.
+    with Session(engine) as session:
+        family_codes = session.exec(select(Member.family_code).distinct()).all()
+        for family_code in family_codes:
+            if not session.exec(select(Lien).where(Lien.family_code == family_code)).first():
+                session.add_all(Lien(family_code=family_code, label=default_label) for default_label in LIENS_DEFAUT)
+        session.commit()
     if DATABASE_URL.startswith("sqlite"):
         with engine.begin() as connection:
             columns = connection.execute(text("PRAGMA table_info(task)")).all()
             if not any(column[1] == "deadline" for column in columns):
                 connection.execute(text("ALTER TABLE task ADD COLUMN deadline VARCHAR"))
+            if not any(column[1] == "member_id" for column in columns):
+                connection.execute(text("ALTER TABLE task ADD COLUMN member_id INTEGER"))
+    else:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE task ADD COLUMN IF NOT EXISTS deadline VARCHAR"))
+            connection.execute(text("ALTER TABLE task ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES member(id)"))
+            connection.execute(text("ALTER TABLE member ALTER COLUMN token DROP NOT NULL"))
 
 
 @app.get("/api/health")  # Définit une route GET pour vérifier que l'API fonctionne.
@@ -95,6 +123,7 @@ def signup(
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")  # Signale qu'un compte existe déjà.
 
     family_code = "fam-" + secrets.token_hex(4)  # Génère un identifiant unique pour la nouvelle famille.
+    session.add_all(Lien(family_code=family_code, label=default_label) for default_label in LIENS_DEFAUT)  # Initialise les liens de la nouvelle famille.
     member = Member(  # Construit le premier membre avec les droits administrateur.
         email=normalized_email,
         password_hash=hash_password(password),
@@ -128,6 +157,97 @@ def me(member: Member = Depends(current_member)):  # Reçoit le membre identifi�
     return public_member(member)  # Exclut le hash du mot de passe et le token de la réponse.
 
 
+@app.get("/api/members")  # Définit la route qui renvoie les membres de la famille connectée.
+def get_members(
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+) -> list[dict]:  # Renvoie uniquement les membres partageant la famille du compte connecté.
+    require_admin(member)  # Réserve la liste des comptes à l'administrateur.
+    members = session.exec(
+        select(Member)
+        .where(Member.family_code == member.family_code)
+        .order_by(Member.id != member.id, Member.id)
+    ).all()  # Inclut explicitement le membre connecté, placé en première position.
+    return [public_member(family_member) for family_member in members]
+
+
+@app.get("/api/liens")  # Définit la route qui renvoie les liens de parenté de la famille.
+def get_liens(
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Renvoie la liste des liens gérés par l'administrateur.
+    require_admin(member)  # Réserve la gestion des liens à l'administrateur.
+    liens = session.exec(select(Lien).where(Lien.family_code == member.family_code)).all()
+    return [lien.label for lien in liens]
+
+
+@app.post("/api/liens")  # Définit la route d'ajout d'un lien de parenté.
+def create_lien(
+    label: str = Query(..., min_length=1, description="Libellé du lien de parenté."),
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Ajoute un lien uniquement dans la famille de l'admin connecté.
+    require_admin(member)  # Refuse toute modification par un non-admin.
+    normalized_label = label.strip()  # Nettoie les espaces avant l'enregistrement.
+    if not normalized_label:  # Refuse un libellé vide après nettoyage.
+        raise HTTPException(status_code=422, detail="Le lien ne peut pas être vide")
+    existing = session.exec(select(Lien).where(
+        Lien.family_code == member.family_code, Lien.label == normalized_label
+    )).first()
+    if not existing:  # N'ajoute pas deux fois le même lien dans une famille.
+        session.add(Lien(family_code=member.family_code, label=normalized_label))
+        session.commit()
+    return [lien.label for lien in session.exec(select(Lien).where(Lien.family_code == member.family_code)).all()]
+
+
+@app.post("/api/members")  # Définit la route de création d'un compte familial.
+def create_member(
+    email: str,
+    password: str,
+    name: str,
+    lien: str = "",
+    is_admin: bool = False,
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Crée un compte dans la famille de l'administrateur connecté.
+    require_admin(member)  # Réserve la création de comptes à l'administrateur.
+    normalized_email = email.strip().lower()  # Normalise l'adresse avant de vérifier son unicité.
+    if session.exec(select(Member).where(Member.email == normalized_email)).first():
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+    new_member = Member(
+        email=normalized_email,
+        password_hash=hash_password(password),
+        name=name.strip(),
+        lien=lien.strip(),
+        is_admin=is_admin,
+        family_code=member.family_code,
+    )
+    session.add(new_member)  # Ajoute le nouveau compte à la session.
+    session.commit()  # Enregistre le compte dans la base.
+    session.refresh(new_member)  # Recharge son identifiant généré.
+    return public_member(new_member)
+
+
+@app.delete("/api/members/{member_id}")  # Définit la route de suppression d'un compte familial.
+def delete_member(
+    member_id: int,
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Supprime un membre et toutes ses tâches dans la famille de l'admin.
+    require_admin(member)  # Réserve la suppression de comptes à l'administrateur.
+    member_to_delete = session.get(Member, member_id)
+    if not member_to_delete or member_to_delete.family_code != member.family_code:
+        raise HTTPException(status_code=404, detail="Membre introuvable dans votre famille")
+    if member_to_delete.id == member.id:  # Empêche l'administrateur de supprimer son propre compte.
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
+    tasks = session.exec(select(Task).where(Task.member_id == member_to_delete.id)).all()
+    for task in tasks:  # Supprime d'abord les tâches pour respecter la clé étrangère.
+        session.delete(task)
+    session.delete(member_to_delete)  # Supprime ensuite le compte familial.
+    session.commit()  # Valide la suppression des tâches et du membre.
+    return {"ok": True, "message": "Membre supprimé"}
+
+
 @app.post("/api/logout")  # Définit la route de déconnexion du membre connecté.
 def logout(
     member: Member = Depends(current_member),
@@ -139,48 +259,78 @@ def logout(
     return {"ok": True, "message": "Déconnexion réussie"}  # Confirme la déconnexion.
 
 
-@app.get("/api/tasks")  # Définit une route GET pour récupérer toutes les tâches.
-def get_tasks():  # Fonction appelée pour lire toutes les tâches enregistrées.
-    with Session(engine) as session:  # Ouvre une session SQLModel pour dialoguer avec la base.
-        tasks = session.exec(select(Task)).all()  # Sélectionne toutes les lignes de la table Task.
-        return tasks  # Renvoie la liste des tâches sous forme de JSON au frontend.
+@app.get("/api/tasks")  # Définit une route GET pour récupérer les tâches du membre connecté.
+def get_tasks(
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Fonction appelée pour lire les tâches assignées au membre connecté.
+    return session.exec(select(Task).where(Task.member_id == member.id)).all()  # Ne renvoie que les tâches qui lui sont assignées.
+
+
+@app.get("/api/tasks/famille")  # Définit une route GET pour récupérer toutes les tâches de la famille.
+def get_family_tasks(
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Fonction appelée pour lire les tâches de la famille de l'admin connecté.
+    if not member.is_admin:  # Réserve cette vue globale à l'administrateur de la famille.
+        raise HTTPException(status_code=403, detail="Seul l'admin peut voir les tâches de la famille")
+    return session.exec(
+        select(Task).join(Member, Task.member_id == Member.id).where(Member.family_code == member.family_code)
+    ).all()  # Filtre les tâches par la famille portée par le compte connecté.
 
 
 @app.post("/api/tasks")  # Définit une route POST pour créer une nouvelle tâche.
 def create_task(
     title: str = Query(..., min_length=1, description="Titre de la tâche, obligatoire et non vide."),
     deadline: str | None = Query(default=None, description="Heure limite facultative au format HH:MM."),
+    member_id: int | None = Query(default=None, description="Membre destinataire, réservé à l'admin."),
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
 ):  # Reçoit le titre et l'heure limite facultative de la tâche.
     if not title or not title.strip():  # Vérifie qu'il y a bien un titre significatif après suppression des espaces.
         raise HTTPException(status_code=422, detail="Title cannot be empty")  # Refuse proprement une tâche sans nom avec une erreur 422.
 
-    with Session(engine) as session:  # Ouvre une session SQLModel pour écrire dans la base.
-        db_task = Task(title=title.strip(), done=False, deadline=deadline)  # Crée une nouvelle tâche avec ses données nettoyées.
-        session.add(db_task)  # Ajoute la tâche à la session avant l'enregistrement.
-        session.commit()  # Enregistre la tâche dans la base de données.
-        session.refresh(db_task)  # Recharge l'objet pour obtenir l'id généré automatiquement.
-        return db_task  # Renvoie la tâche créée avec son id au frontend.
+    assignee_id = member.id  # Par défaut, une tâche est toujours assignée au compte connecté.
+    if member_id is not None and member.is_admin:  # Un admin peut choisir un autre destinataire.
+        assignee = session.get(Member, member_id)
+        if not assignee or assignee.family_code != member.family_code:
+            raise HTTPException(status_code=404, detail="Membre introuvable dans votre famille")
+        assignee_id = assignee.id
+
+    db_task = Task(title=title.strip(), done=False, deadline=deadline, member_id=assignee_id)  # Crée la tâche pour le membre retenu.
+    session.add(db_task)  # Ajoute la tâche à la session avant l'enregistrement.
+    session.commit()  # Enregistre la tâche dans la base de données.
+    session.refresh(db_task)  # Recharge l'objet pour obtenir l'id généré automatiquement.
+    return db_task  # Renvoie la tâche créée avec son id au frontend.
 
 
 @app.patch("/api/tasks/{task_id}")  # Définit une route PATCH pour modifier une tâche existante.
-def update_task(task_id: int):  # Fonction appelée pour inverser le statut done d'une tâche.
-    with Session(engine) as session:  # Ouvre une session SQLModel pour modifier la base.
-        db_task = session.get(Task, task_id)  # Cherche la tâche correspondant à l'id donné.
-        if not db_task:  # Si aucune tâche ne correspond, on renvoie une erreur 404.
-            raise HTTPException(status_code=404, detail=f"Task with id {task_id} not found")  # Signale clairement que la tâche n'existe pas.
-        db_task.done = not db_task.done  # Inverse la valeur booléenne : True devient False, False devient True.
-        session.add(db_task)  # Marque la tâche modifiée pour sauvegarde.
-        session.commit()  # Enregistre le changement dans la base.
-        session.refresh(db_task)  # Recharge l'objet pour obtenir le dernier état enregistré.
-        return db_task  # Renvoie la tâche avec le nouveau statut done au frontend.
+def update_task(
+    task_id: int,
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Fonction appelée pour inverser le statut done d'une tâche de la famille.
+    db_task = session.get(Task, task_id)  # Cherche la tâche correspondant à l'id donné.
+    assignee = session.get(Member, db_task.member_id) if db_task and db_task.member_id else None
+    if not db_task or not assignee or assignee.family_code != member.family_code:  # Vérifie que la tâche appartient à la famille.
+        raise HTTPException(status_code=404, detail=f"Task with id {task_id} not found")  # Signale clairement que la tâche n'existe pas.
+    db_task.done = not db_task.done  # Inverse la valeur booléenne : True devient False, False devient True.
+    session.add(db_task)  # Marque la tâche modifiée pour sauvegarde.
+    session.commit()  # Enregistre le changement dans la base.
+    session.refresh(db_task)  # Recharge l'objet pour obtenir le dernier état enregistré.
+    return db_task  # Renvoie la tâche avec le nouveau statut done au frontend.
 
 
 @app.delete("/api/tasks/{task_id}")  # Définit une route DELETE pour supprimer une tâche.
-def delete_task(task_id: int):  # Fonction appelée pour supprimer une tâche par son identifiant.
-    with Session(engine) as session:  # Ouvre une session SQLModel pour faire la suppression.
-        db_task = session.get(Task, task_id)  # Recherche la tâche à supprimer par son id.
-        if not db_task:  # Si la tâche n'existe pas, on renvoie une erreur 404.
-            raise HTTPException(status_code=404, detail=f"Task with id {task_id} not found")  # Signale clairement que la tâche n'existe pas.
-        session.delete(db_task)  # Supprime l'objet de la base de données.
-        session.commit()  # Confirme la suppression dans la base.
-        return {"ok": True, "message": "Task deleted"}  # Renvoie une confirmation de suppression au frontend.
+def delete_task(
+    task_id: int,
+    member: Member = Depends(current_member),
+    session: Session = Depends(get_session),
+):  # Fonction appelée pour supprimer une tâche de la famille.
+    db_task = session.get(Task, task_id)  # Recherche la tâche à supprimer par son id.
+    assignee = session.get(Member, db_task.member_id) if db_task and db_task.member_id else None
+    if not db_task or not assignee or assignee.family_code != member.family_code:  # Vérifie que la tâche appartient à la famille.
+        raise HTTPException(status_code=404, detail=f"Task with id {task_id} not found")  # Signale clairement que la tâche n'existe pas.
+    session.delete(db_task)  # Supprime l'objet de la base de données.
+    session.commit()  # Confirme la suppression dans la base.
+    return {"ok": True, "message": "Task deleted"}  # Renvoie une confirmation de suppression.

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { apiFetch } from '../api'
 
 const router = useRouter()
 const family = ref('')
@@ -18,7 +19,7 @@ async function submitSignup() {
 
   try {
     const params = new URLSearchParams({ family: family.value, name: name.value, lien: lien.value, email: email.value, password: password.value })
-    const response = await fetch(`/api/signup?${params}`, { method: 'POST' })
+    const response = await apiFetch(`/api/signup?${params}`, { method: 'POST' })
     const data = await response.json()
     if (!response.ok) throw new Error(data.detail || 'La création de la famille a été refusée.')
 

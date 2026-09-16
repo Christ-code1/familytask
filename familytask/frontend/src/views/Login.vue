@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { apiFetch } from '../api'
 
 const router = useRouter()
 const email = ref('')
@@ -15,7 +16,7 @@ async function submitLogin() {
 
   try {
     const params = new URLSearchParams({ email: email.value, password: password.value })
-    const response = await fetch(`/api/login?${params}`, { method: 'POST' })
+    const response = await apiFetch(`/api/login?${params}`, { method: 'POST' })
     const data = await response.json()
     if (!response.ok) throw new Error(data.detail || 'Email ou mot de passe incorrect.')
 

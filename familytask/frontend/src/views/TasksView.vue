@@ -1,8 +1,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { apiFetch } from '../api'
 
 const tasks = ref([])
 const currentMember = ref(null)
+const familyMembers = ref([])
+const selectedMemberId = ref('')
 const newTask = ref('')
 const newTaskDeadline = ref('')
 const now = ref(Date.now())
@@ -13,26 +17,27 @@ const isWelcomeGifFading = ref(false)
 const errorMessage = ref('')
 let clockTimer
 
-// Ajoute le token de session aux requêtes de la liste privée.
-function authHeaders() {
-  return { Authorization: `Bearer ${localStorage.getItem('token') || ''}` }
-}
-
 async function fetchCurrentMember() {
-  const response = await fetch('/api/me', { headers: authHeaders() })
+  const response = await apiFetch('/api/me')
   if (response.ok) currentMember.value = await response.json()
 }
 
 async function fetchTasks() {
-  const response = await fetch('/api/tasks', { headers: authHeaders() })
+  const response = await apiFetch('/api/tasks')
   if (!response.ok) throw new Error('Impossible de charger les tâches depuis l’API.')
   tasks.value = await response.json()
+}
+
+async function fetchFamilyMembers() {
+  const response = await apiFetch('/api/members')
+  if (!response.ok) throw new Error('Impossible de charger les membres de la famille.')
+  familyMembers.value = await response.json()
 }
 
 // Efface toujours la session locale, même si l'API est inaccessible.
 async function logout() {
   try {
-    await fetch('/api/logout', { method: 'POST', headers: authHeaders() })
+    await apiFetch('/api/logout', { method: 'POST' })
   } catch (error) {
     console.warn('Serveur inaccessible, déconnexion locale appliquée.', error)
   } finally {
@@ -44,6 +49,7 @@ async function logout() {
 onMounted(async () => {
   try {
     await Promise.all([fetchCurrentMember(), fetchTasks()])
+    if (currentMember.value?.is_admin) await fetchFamilyMembers()
   } catch (error) {
     errorMessage.value = error.message
   }
@@ -72,6 +78,8 @@ const warningTask = computed(() => tasks.value.find((task) => {
   return remaining > 0 && remaining <= 60 * 60 * 1000
 }))
 
+const otherMembers = computed(() => familyMembers.value.filter((member) => member.id !== currentMember.value?.id))
+
 function dismissWarning() {
   if (warningTask.value) dismissedWarningTaskId.value = warningTask.value.id
 }
@@ -81,18 +89,19 @@ async function addTask() {
   if (!title) return
   const deadline = newTaskDeadline.value
   const deadlineQuery = deadline ? `&deadline=${encodeURIComponent(deadline)}` : ''
-  const response = await fetch(`/api/tasks?title=${encodeURIComponent(title)}${deadlineQuery}`, {
+  const assigneeQuery = selectedMemberId.value ? `&member_id=${selectedMemberId.value}` : ''
+  const response = await apiFetch(`/api/tasks?title=${encodeURIComponent(title)}${deadlineQuery}${assigneeQuery}`, {
     method: 'POST',
-    headers: authHeaders(),
   })
   if (!response.ok) throw new Error('Impossible d’ajouter la tâche.')
   newTask.value = ''
   newTaskDeadline.value = ''
+  selectedMemberId.value = ''
   await fetchTasks()
 }
 
 async function toggleTaskDone(taskId) {
-  const response = await fetch(`/api/tasks/${taskId}`, { method: 'PATCH', headers: authHeaders() })
+  const response = await apiFetch(`/api/tasks/${taskId}`, { method: 'PATCH' })
   if (!response.ok) throw new Error('Impossible de cocher la tâche.')
   await fetchTasks()
 }
@@ -103,7 +112,7 @@ function requestDelete(taskId) {
 
 async function confirmDelete() {
   if (!taskToDelete.value) return
-  const response = await fetch(`/api/tasks/${taskToDelete.value.id}`, { method: 'DELETE', headers: authHeaders() })
+  const response = await apiFetch(`/api/tasks/${taskToDelete.value.id}`, { method: 'DELETE' })
   if (!response.ok) throw new Error('Impossible de supprimer la tâche.')
   taskToDelete.value = null
   await fetchTasks()
@@ -128,6 +137,7 @@ function cancelDelete() {
       <form class="task-form" @submit.prevent="addTask">
         <input v-model="newTask" type="text" placeholder="Nouvelle tâche" />
         <label class="deadline-field"><span>Limite</span><input v-model="newTaskDeadline" type="time" aria-label="Heure limite facultative" /></label>
+        <label v-if="currentMember?.is_admin" class="assignee-field"><span>Pour qui ?</span><select v-model="selectedMemberId"><option value="">Pour moi</option><option v-for="member in otherMembers" :key="member.id" :value="member.id">{{ member.name }}</option></select></label>
         <button type="submit">Ajouter</button>
       </form>
       <ul class="task-list">
@@ -139,7 +149,8 @@ function cancelDelete() {
     </section>
 
     <div v-if="warningTask" class="confirmation-overlay"><section class="confirmation-dialog deadline-dialog"><img class="warning-image" src="https://media1.tenor.com/m/4NGmv1oM-dUAAAAC/p5-p5r.gif" alt="Avertissement d’échéance" /><p class="confirmation-kicker">TIME IS RUNNING OUT</p><h2>À faire bientôt</h2><p class="confirmation-message">« <strong>{{ warningTask.title }}</strong> » doit être terminée avant {{ warningTask.deadline }}.</p><button type="button" class="confirm-button" @click="dismissWarning">J'ai compris</button></section></div>
-    <div v-if="taskToDelete" class="confirmation-overlay" @click.self="cancelDelete"><section class="confirmation-dialog"><div class="confirmation-mark">!</div><p class="confirmation-kicker">ARE YOU SURE?</p><h2>Delete mission?</h2><p class="confirmation-message">Supprimer « <strong>{{ taskToDelete.title }}</strong> » de la liste ?</p><div class="confirmation-actions"><button type="button" class="cancel-button" @click="cancelDelete">Annuler</button><button type="button" class="confirm-button" @click="confirmDelete">Supprimer</button></div></section></div>
+    <div v-if="taskToDelete" class="confirmation-overlay" @click.self="cancelDelete"><section class="confirmation-dialog deadline-dialog"><img class="warning-image" src="https://media1.tenor.com/m/QmGhkPRqFMwAAAAC/persona-5-persona.gif" alt="Confirmation de suppression" /><p class="confirmation-kicker">ARE YOU SURE?</p><h2>Delete mission?</h2><p class="confirmation-message">Supprimer « <strong>{{ taskToDelete.title }}</strong> » de la liste ?</p><div class="confirmation-actions"><button type="button" class="cancel-button" @click="cancelDelete">Annuler</button><button type="button" class="confirm-button" @click="confirmDelete">Supprimer</button></div></section></div>
     <div v-if="showWelcomeGif" class="welcome-gif-overlay" :class="{ 'is-fading': isWelcomeGifFading }" aria-hidden="true"><img class="welcome-gif" src="https://media1.tenor.com/m/Vl-pwtuiQbgAAAAC/take-your-time-persona-five.gif" alt="" /></div>
   </main>
+  <nav v-if="currentMember?.is_admin" class="bottom-tabs" aria-label="Navigation principale"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
 </template>
