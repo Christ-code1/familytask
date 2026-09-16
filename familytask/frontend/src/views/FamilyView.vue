@@ -113,6 +113,10 @@ onMounted(async () => {
 
 <template>
   <header class="topbar">
+    <details v-if="currentMember?.is_admin" class="section-menu">
+      <summary>☰ Menu</summary>
+      <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
+    </details>
     <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / PEOPLE OPS</p><h1>FamilyTask</h1></div></div>
     <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span><RouterLink class="logout-button" to="/tasks">Tâches</RouterLink></div>
   </header>
@@ -158,5 +162,4 @@ onMounted(async () => {
     </section>
   </main>
 
-  <nav v-if="currentMember?.is_admin" class="bottom-tabs" aria-label="Navigation principale"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
 </template>

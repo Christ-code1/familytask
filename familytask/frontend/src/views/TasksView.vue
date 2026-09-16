@@ -125,6 +125,10 @@ function cancelDelete() {
 
 <template>
   <header class="topbar">
+    <details v-if="currentMember?.is_admin" class="section-menu">
+      <summary>☰ Menu</summary>
+      <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
+    </details>
     <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / DAILY OPS</p><h1>FamilyTask</h1></div></div>
     <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span><button type="button" class="logout-button" @click="logout">Se déconnecter</button></div>
   </header>
@@ -137,7 +141,7 @@ function cancelDelete() {
       <form class="task-form" @submit.prevent="addTask">
         <input v-model="newTask" type="text" placeholder="Nouvelle tâche" />
         <label class="deadline-field"><span>Limite</span><input v-model="newTaskDeadline" type="time" aria-label="Heure limite facultative" /></label>
-        <label v-if="currentMember?.is_admin" class="assignee-field"><span>Pour qui ?</span><select v-model="selectedMemberId"><option value="">Pour moi</option><option v-for="member in otherMembers" :key="member.id" :value="member.id">{{ member.name }}</option></select></label>
+        <label v-if="currentMember?.is_admin" class="assignee-field"><span>Pour qui ?</span><select v-model="selectedMemberId"><option value="">Moi</option><option v-for="member in otherMembers" :key="member.id" :value="member.id">{{ member.name }}</option></select></label>
         <button type="submit">Ajouter</button>
       </form>
       <ul class="task-list">
@@ -152,5 +156,4 @@ function cancelDelete() {
     <div v-if="taskToDelete" class="confirmation-overlay" @click.self="cancelDelete"><section class="confirmation-dialog deadline-dialog"><img class="warning-image" src="https://media1.tenor.com/m/QmGhkPRqFMwAAAAC/persona-5-persona.gif" alt="Confirmation de suppression" /><p class="confirmation-kicker">ARE YOU SURE?</p><h2>Delete mission?</h2><p class="confirmation-message">Supprimer « <strong>{{ taskToDelete.title }}</strong> » de la liste ?</p><div class="confirmation-actions"><button type="button" class="cancel-button" @click="cancelDelete">Annuler</button><button type="button" class="confirm-button" @click="confirmDelete">Supprimer</button></div></section></div>
     <div v-if="showWelcomeGif" class="welcome-gif-overlay" :class="{ 'is-fading': isWelcomeGifFading }" aria-hidden="true"><img class="welcome-gif" src="https://media1.tenor.com/m/Vl-pwtuiQbgAAAAC/take-your-time-persona-five.gif" alt="" /></div>
   </main>
-  <nav v-if="currentMember?.is_admin" class="bottom-tabs" aria-label="Navigation principale"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
 </template>
