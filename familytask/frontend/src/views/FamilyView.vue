@@ -12,6 +12,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const isSubmitting = ref(false)
 const newLien = ref('')
+const memberToDelete = ref(null)
 const newMember = ref({ name: '', lien: '', email: '', password: '', is_admin: false })
 
 const memberNames = computed(() => new Map(members.value.map((member) => [member.id, member.name])))
@@ -89,17 +90,26 @@ async function addLien() {
   successMessage.value = 'Lien ajouté.'
 }
 
-async function deleteMember(member) {
-  // La confirmation évite une suppression accidentelle du compte et de ses tâches.
-  if (!window.confirm(`Supprimer le compte de ${member.name} et ses tâches ?`)) return
+function requestDeleteMember(member) {
+  // Ouvre la même confirmation graphique que pour la suppression d'une tâche.
+  memberToDelete.value = member
+}
+
+async function confirmDeleteMember() {
+  if (!memberToDelete.value) return
   errorMessage.value = ''
-  const response = await apiFetch(`/api/members/${member.id}`, { method: 'DELETE' })
+  const response = await apiFetch(`/api/members/${memberToDelete.value.id}`, { method: 'DELETE' })
   const data = await readApiResponse(response)
   if (!response.ok) {
     errorMessage.value = data.detail || 'Impossible de supprimer ce membre.'
     return
   }
+  memberToDelete.value = null
   await loadFamily()
+}
+
+function cancelDeleteMember() {
+  memberToDelete.value = null
 }
 
 onMounted(async () => {
@@ -131,7 +141,7 @@ onMounted(async () => {
       <ul class="member-list">
         <li v-for="member in members" :key="member.id" class="member-row">
           <div><strong>{{ member.name }}</strong><span class="member-relation">{{ member.lien || 'Lien non renseigné' }}</span><span v-if="member.is_admin" class="admin-badge">admin</span></div>
-          <button v-if="member.id !== currentMember.id" type="button" class="delete-button" :aria-label="`Supprimer ${member.name}`" :title="`Supprimer ${member.name}`" @click="deleteMember(member)">🗑️</button>
+          <button v-if="member.id !== currentMember.id" type="button" class="delete-button" :aria-label="`Supprimer ${member.name}`" :title="`Supprimer ${member.name}`" @click="requestDeleteMember(member)">🗑️</button>
         </li>
       </ul>
     </section>
@@ -160,6 +170,8 @@ onMounted(async () => {
       <div class="board-heading"><div><p class="section-label">FAMILY TASKS</p><h3>Toutes les missions</h3></div><span class="task-count">{{ familyTasks.length }} TÂCHES</span></div>
       <ul class="task-list"><li v-for="task in familyTasks" :key="task.id" class="task-row"><div><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><small class="task-owner">{{ memberNames.get(task.member_id) || 'Membre inconnu' }}</small></div><small v-if="task.deadline" class="task-deadline">pour {{ task.deadline }}</small></li><li v-if="!familyTasks.length" class="empty-state">Aucune tâche dans la famille.</li></ul>
     </section>
+
+    <div v-if="memberToDelete" class="confirmation-overlay" @click.self="cancelDeleteMember"><section class="confirmation-dialog deadline-dialog"><img class="warning-image" src="https://media1.tenor.com/m/QmGhkPRqFMwAAAAC/persona-5-persona.gif" alt="Confirmation de suppression" /><p class="confirmation-kicker">ARE YOU SURE?</p><h2>Delete member?</h2><p class="confirmation-message">Supprimer « <strong>{{ memberToDelete.name }}</strong> » et toutes ses tâches ?</p><div class="confirmation-actions"><button type="button" class="cancel-button" @click="cancelDeleteMember">Annuler</button><button type="button" class="confirm-button" @click="confirmDeleteMember">Supprimer</button></div></section></div>
   </main>
 
 </template>
