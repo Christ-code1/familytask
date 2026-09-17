@@ -2,7 +2,7 @@ import os
 # Base SQLite de test, neuve à chaque exécution.
 if os.path.exists("./test.db"):
     os.remove("./test.db")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"  # Force la base de test (écrase la valeur Postgres définie par docker-compose).
 os.environ.pop("AI_TOKEN", None)  # Sans clé, l'assistant ne doit jamais essayer d'appeler l'IA.
 
 from fastapi.testclient import TestClient
