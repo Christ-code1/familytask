@@ -315,6 +315,7 @@ def delete_member(
     tasks = session.exec(select(Task).where(Task.member_id == member_to_delete.id)).all()
     for task in tasks:  # Supprime d'abord les tâches pour respecter la clé étrangère.
         session.delete(task)
+    session.flush()  # Envoie réellement les DELETE des tâches avant celui du membre (sinon Postgres refuse, sans ordre garanti).
     session.delete(member_to_delete)  # Supprime ensuite le compte familial.
     session.commit()  # Valide la suppression des tâches et du membre.
     return {"ok": True, "message": "Membre supprimé"}
