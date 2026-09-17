@@ -1,6 +1,7 @@
 import json
 import hashlib
 import os
+import re
 import secrets
 import unicodedata
 
@@ -93,6 +94,31 @@ def strip_possessive(phrase: str) -> str:  # Retire l'article possessif d'une ex
 def find_members_by_lien(members: list[Member], phrase: str) -> list[Member]:  # Cherche les membres partageant un lien de parenté.
     target = normalize_name(strip_possessive(phrase))  # Isole le lien (« fille ») et le normalise.
     return [m for m in members if normalize_name(m.lien) == target]  # Renvoie tous les membres portant ce lien.
+
+
+ARTICLES_AVEC_ESPACE = ("ma", "mon", "mes", "notre", "nos", "la", "le", "les")  # Articles suivis d'un espace avant le lien (« ma fille »).
+
+
+def pluralize_fr(word: str) -> str:  # Mets un mot simple au pluriel pour la question de désambiguïsation.
+    return word if word.endswith("s") else word + "s"  # Ajoute un « s » final, sauf s'il y est déjà.
+
+
+def find_ambiguous_lien(message: str, members: list[Member]) -> tuple[str, list[Member]] | None:  # Repère un lien cité tel quel dans le message brut, avant même d'appeler l'IA.
+    normalized_message = normalize_name(message)  # Normalise le message pour comparer sans accent ni casse.
+    liens_distincts: dict[str, str] = {}  # Un seul essai par lien distinct (garde le libellé d'origine pour la réponse).
+    for m in members:
+        if m.lien and normalize_name(m.lien) not in liens_distincts:
+            liens_distincts[normalize_name(m.lien)] = m.lien
+    for target, lien_label in liens_distincts.items():
+        if not target:
+            continue
+        mots = "|".join(re.escape(mot) for mot in ARTICLES_AVEC_ESPACE)  # Articles avec espace (« ma », « la »...).
+        pattern = rf"\b(?:{mots})\s+{re.escape(target)}\b|\bl['’]{re.escape(target)}\b"  # Ou « l'oncle » collé à l'apostrophe.
+        if re.search(pattern, normalized_message):  # Le message parle bien de ce lien, tel quel.
+            matches = [m for m in members if normalize_name(m.lien) == target]
+            if len(matches) > 1:  # Plusieurs personnes partagent ce lien : on ne devine pas, on demande.
+                return lien_label, matches
+    return None  # Aucun lien ambigu trouvé dans le message brut.
 
 
 def public_member(member: Member) -> dict:  # Prépare les informations publiques d'un membre sans son hash.
@@ -331,6 +357,16 @@ async def assistant(
     member: Member = Depends(current_member),
     session: Session = Depends(get_session),
 ):  # Envoie le message du membre connecté à GitHub Models.
+    family_members = session.exec(
+        select(Member).where(Member.family_code == member.family_code)
+    ).all()
+
+    ambiguous = find_ambiguous_lien(message, family_members)  # Vérifie le message brut avant l'IA : jamais de choix au hasard.
+    if ambiguous:
+        lien_label, matches = ambiguous
+        noms = ", ".join(m.name for m in matches)
+        return {"reply": f"Il y a plusieurs {pluralize_fr(lien_label)} ({noms}). Pour qui ?"}
+
     ai_token = os.getenv("AI_TOKEN", "").strip()
     if not ai_token:
         return {"reply": "L'assistant IA n'est pas configuré : la clé AI_TOKEN est manquante."}
@@ -366,9 +402,6 @@ async def assistant(
             if not title or not person:
                 return {"reply": "Le titre et la personne sont nécessaires pour ajouter une tâche."}
 
-            family_members = session.exec(
-                select(Member).where(Member.family_code == member.family_code)
-            ).all()
             assignee = find_member_by_name(family_members, person)
             if not assignee:
                 lien_matches = find_members_by_lien(family_members, person)  # Essaie ensuite par lien de parenté (« ma fille »).
