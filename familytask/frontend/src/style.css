@@ -327,6 +327,62 @@ body::before {
 }
 .confirmation-message { max-width: 330px; margin: 20px 0 27px; line-height: 1.5; }
 .confirmation-message strong { color: var(--yellow); }
+
+/* Assistant IA : zone de messages, champ + bouton micro. */
+.chat-log {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 320px;
+        margin-bottom: 20px;
+        padding: 16px;
+        overflow-y: auto;
+        background: var(--paper);
+        border: 2px solid var(--ink);
+}
+.chat-message {
+        max-width: 80%;
+        margin: 0;
+        padding: 10px 13px;
+        line-height: 1.4;
+        font-weight: 700;
+        border: 2px solid var(--ink);
+}
+.chat-message.user {
+        align-self: flex-end;
+        color: #fff;
+        background: var(--red);
+}
+.chat-message.assistant {
+        align-self: flex-start;
+        color: var(--ink);
+        background: #fff;
+        box-shadow: 3px 3px 0 var(--ink);
+}
+.chat-message.is-typing { opacity: .6; font-weight: 900; }
+.chat-form { margin: 0; }
+/* Spécificité supérieure à « .task-form button » (dont .chat-form hérite le style) pour que le micro garde ses propres couleurs. */
+.chat-form button.mic-button {
+        display: grid;
+        flex: none;
+        width: 52px;
+        padding: 0;
+        place-items: center;
+        color: var(--ink);
+        background: var(--yellow);
+        border: 2px solid var(--ink);
+        border-radius: 0;
+        box-shadow: 4px 4px 0 var(--ink);
+        cursor: pointer;
+        font-size: 18px;
+}
+.chat-form button.mic-button:hover { background: var(--yellow); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+.chat-form button.mic-button.is-listening { background: var(--red); animation: mic-pulse 1s ease-in-out infinite; }
+@keyframes mic-pulse {
+        0%, 100% { box-shadow: 4px 4px 0 var(--ink); }
+        50% { box-shadow: 4px 4px 0 var(--ink), 0 0 0 6px rgba(229, 43, 50, .35); }
+}
+.voice-hint { margin: 12px 0 0; font-size: 12px; font-weight: 700; opacity: .7; }
 .confirmation-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .confirmation-actions button {
         min-height: 43px;
@@ -396,6 +452,9 @@ body::before {
         .card { padding: 22px 18px; box-shadow: 7px 7px 0 var(--red); }
         .task-form { align-items: stretch; flex-direction: column; }
         .task-form button { min-height: 47px; }
+        .chat-form button.mic-button { width: 100%; min-height: 47px; }
+        .chat-log { max-height: 260px; }
+        .chat-message { max-width: 92%; }
         .deadline-field { min-height: 52px; }
         .assignee-field { min-height: 52px; }
         .confirmation-dialog { padding: 34px 22px 24px; box-shadow: 7px 7px 0 var(--red); }
