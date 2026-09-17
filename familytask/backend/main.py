@@ -2,6 +2,7 @@ import json
 import hashlib
 import os
 import secrets
+import unicodedata
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query  # Importe les outils FastAPI pour les routes, les dépendances et la validation.
@@ -37,6 +38,12 @@ def hash_password(pw: str) -> str:  # Transforme un mot de passe en hash SHA-256
     return hashlib.sha256(pw.encode("utf-8")).hexdigest()  # Encode le mot de passe et renvoie son empreinte hexadécimale.
 
 
+def normalize_name(text: str) -> str:  # Met un nom en forme simple pour comparer sans piéger sur la casse ou les accents.
+    text = text.strip().lower()  # Retire les espaces superflus et uniformise la casse.
+    decomposed = unicodedata.normalize("NFKD", text)  # Sépare chaque lettre accentuée de son accent.
+    return "".join(char for char in decomposed if not unicodedata.combining(char))  # Ne garde que les lettres, sans les accents.
+
+
 class Task(SQLModel, table=True):  # Définit le modèle SQLModel pour une tâche enregistrée en base.
     id: int | None = Field(default=None, primary_key=True)  # Définit l'identifiant unique, auto-généré par la base.
     title: str = Field(nullable=False)  # Définit le titre de la tâche, obligatoire.
@@ -65,6 +72,27 @@ class Member(SQLModel, table=True):  # Définit le modèle SQLModel pour un memb
 def get_session():  # Fournit une session de base de données aux routes qui en ont besoin.
     with Session(engine) as session:  # Ouvre une session puis la ferme automatiquement après la requête.
         yield session  # Rend la session disponible via l'injection de dépendance FastAPI.
+
+
+def find_member_by_name(members: list[Member], person: str) -> Member | None:  # Cherche un membre de la famille par son prénom.
+    target = normalize_name(person)  # Normalise le nom fourni par l'assistant IA.
+    return next((m for m in members if normalize_name(m.name) == target), None)  # Renvoie le premier membre dont le nom correspond.
+
+
+POSSESSIFS = ("ma ", "mon ", "mes ", "notre ", "nos ", "la ", "le ", "les ", "l'")  # Articles à retirer avant de comparer un lien.
+
+
+def strip_possessive(phrase: str) -> str:  # Retire l'article possessif d'une expression comme « ma fille ».
+    normalized = phrase.strip().lower()  # Uniformise la casse avant de chercher un préfixe.
+    for prefix in POSSESSIFS:  # Essaie chaque article possible dans l'ordre.
+        if normalized.startswith(prefix):  # Coupe le préfixe s'il est présent.
+            return normalized[len(prefix):].strip()
+    return normalized  # Renvoie l'expression telle quelle si aucun article n'a été trouvé.
+
+
+def find_members_by_lien(members: list[Member], phrase: str) -> list[Member]:  # Cherche les membres partageant un lien de parenté.
+    target = normalize_name(strip_possessive(phrase))  # Isole le lien (« fille ») et le normalise.
+    return [m for m in members if normalize_name(m.lien) == target]  # Renvoie tous les membres portant ce lien.
 
 
 def public_member(member: Member) -> dict:  # Prépare les informations publiques d'un membre sans son hash.
@@ -334,22 +362,23 @@ async def assistant(
                 return {"reply": "L'assistant a demandé une action inconnue."}
 
             title = str(arguments.get("titre", "")).strip()
-            person = str(arguments.get("personne", "")).strip().lower()
+            person = str(arguments.get("personne", "")).strip()
             if not title or not person:
                 return {"reply": "Le titre et la personne sont nécessaires pour ajouter une tâche."}
 
-            assignee = next(
-                (
-                    family_member
-                    for family_member in session.exec(
-                        select(Member).where(Member.family_code == member.family_code)
-                    ).all()
-                    if family_member.name.strip().lower() == person
-                ),
-                None,
-            )
+            family_members = session.exec(
+                select(Member).where(Member.family_code == member.family_code)
+            ).all()
+            assignee = find_member_by_name(family_members, person)
             if not assignee:
-                return {"reply": f"Je ne trouve pas de membre correspondant à « {person} »."}
+                lien_matches = find_members_by_lien(family_members, person)  # Essaie ensuite par lien de parenté (« ma fille »).
+                if len(lien_matches) > 1:  # Plusieurs personnes partagent ce lien : on demande de préciser.
+                    noms = ", ".join(m.name for m in lien_matches)
+                    return {"reply": f"Il y a plusieurs correspondances pour « {person} » : {noms}. Pour qui exactement ?"}
+                if len(lien_matches) == 1:  # Un seul membre correspond : pas d'ambiguïté.
+                    assignee = lien_matches[0]
+                else:
+                    return {"reply": f"Je ne trouve pas de membre correspondant à « {person} »."}
 
             session.add(Task(title=title, member_id=assignee.id))
             session.commit()
