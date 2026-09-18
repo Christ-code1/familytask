@@ -6,3 +6,22 @@ databases:
   # Base de données PostgreSQL utilisée par le back-end de FamilyTask.
   - name: familytask-db  # Nom de la ressource affiché dans le tableau de bord Render.
     plan: free  # Plan gratuit de Render pour ce projet de cours.
+
+services:
+  # Service web qui exécute l'API FastAPI du back-end.
+  - type: web
+    name: familytask-api  # Nom de la ressource affiché dans le tableau de bord Render.
+    runtime: python  # Render construit et exécute ce service avec Python.
+    plan: free  # Plan gratuit de Render pour ce projet de cours.
+    rootDir: familytask/backend  # Dossier du dépôt contenant le code du back-end.
+    buildCommand: pip install -r requirements.txt  # Installe les dépendances Python.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT  # Lance le serveur FastAPI.
+    envVars:
+      # Adresse de connexion à la base familytask-db, fournie automatiquement par Render.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: familytask-db
+          property: connectionString
+      # Clé de l'IA : jamais écrite ici, à renseigner manuellement dans le tableau de bord Render.
+      - key: AI_TOKEN
+        sync: false
