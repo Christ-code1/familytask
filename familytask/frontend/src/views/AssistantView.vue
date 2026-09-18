@@ -1,15 +1,28 @@
 <script setup>
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { apiFetch } from '../api'
 import ChatAssistant from '../components/ChatAssistant.vue'
+
+const currentMember = ref(null)
+
+// Nécessaire pour savoir si le lien « Famille » doit apparaître dans le menu, comme sur les autres pages.
+async function fetchCurrentMember() {
+  const response = await apiFetch('/api/me')
+  if (response.ok) currentMember.value = await response.json()
+}
+
+onMounted(fetchCurrentMember)
 </script>
 
 <template>
   <header class="topbar">
+    <details class="section-menu">
+      <summary>☰ Menu</summary>
+      <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/assistant">Assistant IA</RouterLink><RouterLink v-if="currentMember?.is_admin" to="/family">Famille</RouterLink></nav>
+    </details>
     <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / ASSISTANT</p><h1>FamilyTask</h1></div></div>
-    <nav class="topbar-actions" aria-label="Navigation principale">
-      <RouterLink to="/tasks">Tâches</RouterLink>
-      <RouterLink to="/family">Famille</RouterLink>
-    </nav>
+    <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span></div>
   </header>
 
   <main class="page-shell">
