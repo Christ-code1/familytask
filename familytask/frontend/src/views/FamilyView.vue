@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { apiFetch } from '../api'
+import MemberAvatar from '../components/MemberAvatar.vue'
 
 const router = useRouter()
 const currentMember = ref(null)
@@ -128,7 +129,7 @@ onMounted(async () => {
       <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/assistant">Assistant IA</RouterLink><RouterLink to="/family">Famille</RouterLink></nav>
     </details>
     <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / PEOPLE OPS</p><h1>FamilyTask</h1></div></div>
-    <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span><RouterLink class="logout-button" to="/tasks">Tâches</RouterLink></div>
+    <div class="topbar-actions"><span v-if="currentMember" class="member-greeting"><MemberAvatar :name="currentMember.name" size="small" />Bonjour {{ currentMember.name }}</span><RouterLink class="logout-button" to="/tasks">Tâches</RouterLink></div>
   </header>
 
   <main v-if="currentMember?.is_admin" class="page-shell family-shell">
@@ -140,6 +141,7 @@ onMounted(async () => {
       <div class="board-heading"><div><p class="section-label">MEMBERS</p><h3>Qui fait partie de l’équipe ?</h3></div><span class="task-count">{{ members.length }} MEMBRES</span></div>
       <ul class="member-list">
         <li v-for="member in members" :key="member.id" class="member-row">
+          <MemberAvatar :name="member.name" />
           <div><strong>{{ member.name }}</strong><span class="member-relation">{{ member.lien || 'Lien non renseigné' }}</span><span v-if="member.is_admin" class="admin-badge">admin</span></div>
           <button v-if="member.id !== currentMember.id" type="button" class="delete-button" :aria-label="`Supprimer ${member.name}`" :title="`Supprimer ${member.name}`" @click="requestDeleteMember(member)">🗑️</button>
         </li>
