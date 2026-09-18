@@ -25,3 +25,22 @@ services:
       # Clé de l'IA : jamais écrite ici, à renseigner manuellement dans le tableau de bord Render.
       - key: AI_TOKEN
         sync: false
+
+  # Site statique qui sert le frontend Vue construit avec Vite.
+  - type: static
+    name: familytask-front  # Nom de la ressource affiché dans le tableau de bord Render.
+    rootDir: familytask/frontend  # Dossier du dépôt contenant le code du frontend.
+    buildCommand: npm install && npm run build  # Installe les dépendances puis construit le site.
+    staticPublishPath: dist  # Dossier généré par le build, publié tel quel par Render.
+    envVars:
+      # Adresse du service familytask-api, injectée automatiquement par Render au moment du build.
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: familytask-api
+          property: host
+    routes:
+      # Redirige toutes les routes vers index.html pour laisser Vue Router gérer la navigation côté client.
+      - type: rewrite
+        source: /*
+        destination: /index.html
