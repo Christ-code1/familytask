@@ -81,6 +81,7 @@ body::after {
 .eyebrow { color: var(--yellow); }
 .topbar h1 {
         margin: 1px 0 0;
+        color: var(--red);
         font-family: Impact, 'Arial Black', sans-serif;
         font-size: clamp(28px, 5vw, 44px);
         line-height: .95;
