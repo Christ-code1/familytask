@@ -33,12 +33,11 @@ services:
     buildCommand: npm install && npm run build  # Installe les dépendances puis construit le site.
     staticPublishPath: dist  # Dossier généré par le build, publié tel quel par Render.
     envVars:
-      # Adresse du service familytask-api, injectée automatiquement par Render au moment du build.
+      # Adresse publique du service familytask-api (à adapter si le nom du service change sur Render).
+      # Fixée en dur car "fromService: property: host" renvoie le nom d'hôte du réseau privé Render,
+      # inutilisable depuis le navigateur de l'utilisateur.
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: familytask-api
-          property: host
+        value: https://familytask-api.onrender.com
     routes:
       # Redirige toutes les routes vers index.html pour laisser Vue Router gérer la navigation côté client.
       - type: rewrite
