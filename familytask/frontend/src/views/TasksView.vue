@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiFetch } from '../api'
-import MemberAvatar from '../components/MemberAvatar.vue'
 
 const tasks = ref([])
 const currentMember = ref(null)
@@ -131,7 +130,7 @@ function cancelDelete() {
       <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/assistant">Assistant IA</RouterLink><RouterLink v-if="currentMember?.is_admin" to="/family">Famille</RouterLink></nav>
     </details>
     <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / DAILY OPS</p><h1>FamilyTask</h1></div></div>
-    <div class="topbar-actions"><span v-if="currentMember" class="member-greeting"><MemberAvatar :name="currentMember.name" size="small" />Bonjour {{ currentMember.name }}</span><button type="button" class="logout-button" @click="logout">Se déconnecter</button></div>
+    <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span><button type="button" class="logout-button" @click="logout">Se déconnecter</button></div>
   </header>
 
   <main class="page-shell">
