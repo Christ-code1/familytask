@@ -1,0 +1,8 @@
+# Fichier de configuration Render (Blueprint) : décrit les ressources à créer
+# automatiquement sur Render à partir de ce dépôt.
+# Documentation : https://render.com/docs/blueprint-spec
+
+databases:
+  # Base de données PostgreSQL utilisée par le back-end de FamilyTask.
+  - name: familytask-db  # Nom de la ressource affiché dans le tableau de bord Render.
+    plan: free  # Plan gratuit de Render pour ce projet de cours.
