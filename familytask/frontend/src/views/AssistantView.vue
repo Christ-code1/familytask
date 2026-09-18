@@ -21,7 +21,7 @@ onMounted(fetchCurrentMember)
       <summary>☰ Menu</summary>
       <nav aria-label="Sections de l'application"><RouterLink to="/tasks">Tâches</RouterLink><RouterLink to="/assistant">Assistant IA</RouterLink><RouterLink v-if="currentMember?.is_admin" to="/family">Famille</RouterLink></nav>
     </details>
-    <div class="brand-lockup"><span class="brand-mark">✦</span><div><p class="eyebrow">FAMILY HQ / ASSISTANT</p><h1>FamilyTask</h1></div></div>
+    <div class="brand-lockup"><div><h1>FamilyTask</h1></div></div>
     <div class="topbar-actions"><span v-if="currentMember" class="member-greeting">Bonjour {{ currentMember.name }}</span></div>
   </header>
 
