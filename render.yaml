@@ -27,7 +27,8 @@ services:
         sync: false
 
   # Site statique qui sert le frontend Vue construit avec Vite.
-  - type: static
+  - type: web
+    runtime: static  # Type "static" seul n'est plus reconnu par Render : il faut type web + runtime static.
     name: familytask-front  # Nom de la ressource affiché dans le tableau de bord Render.
     rootDir: familytask/frontend  # Dossier du dépôt contenant le code du frontend.
     buildCommand: npm install && npm run build  # Installe les dépendances puis construit le site.
